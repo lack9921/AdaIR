@@ -77,12 +77,12 @@ def main():
     trainloader = DataLoader(trainset, batch_size=opt.batch_size, pin_memory=True, shuffle=True,
                              drop_last=True, num_workers=opt.num_workers)
 
-    # ===== [Elvis] Auto-set de_type and create validation dataloader =====
+    # ===== [Elvis] Create validation dataloader =====
+    if opt.elvis_mode:
         print("[Elvis] Creating validation set (last {} images per type)...".format(opt.elvis_val_last_n))
         valset = AdaIRTrainDataset(opt, elvis_val=True)
         val_loader = DataLoader(valset, batch_size=opt.batch_size, pin_memory=True, shuffle=False,
                                 drop_last=False, num_workers=opt.num_workers)
-    
     model = AdaIRModel()
     
     trainer = pl.Trainer( max_epochs=opt.epochs,accelerator="gpu",devices=opt.num_gpus,strategy="ddp_find_unused_parameters_true",logger=logger,callbacks=[checkpoint_callback])
