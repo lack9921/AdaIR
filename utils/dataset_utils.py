@@ -101,7 +101,7 @@ class AdaIRTrainDataset(Dataset):
                     'name': os.path.splitext(fname)[0]
                 })
 
-            print(f'[Elvis] {de_type_name}: {len(selected)} samples ({'val' if self.elvis_val else 'train'})')
+            print(f'[Elvis] {de_type_name}: {len(selected)} samples ({"val" if self.elvis_val else "train"})')
 
     # --- Original methods below (unchanged) ---
     def _init_clean_ids(self):
