@@ -67,18 +67,17 @@ def main():
     else:
         logger = TensorBoardLogger(save_dir = "logs/")
 
+    # [Elvis] Override de_type before creating dataset
+    if opt.elvis_mode:
+        if opt.de_type == ["denoise_15", "denoise_25", "denoise_50", "derain", "dehaze", "deblur", "enhance"]:
+            opt.de_type = ["blur", "haze", "lowlight", "rain", "snow"]
+        print("[Elvis] de_type = {}".format(opt.de_type))
     trainset = AdaIRTrainDataset(opt)
     checkpoint_callback = ModelCheckpoint(dirpath = opt.ckpt_dir,every_n_epochs = 1,save_top_k=-1)
     trainloader = DataLoader(trainset, batch_size=opt.batch_size, pin_memory=True, shuffle=True,
                              drop_last=True, num_workers=opt.num_workers)
 
     # ===== [Elvis] Auto-set de_type and create validation dataloader =====
-    val_loader = None
-    if opt.elvis_mode:
-        # Auto-override de_type to Elvis 5 types so _init_elvis_ids() fires
-        if opt.de_type == ['denoise_15', 'denoise_25', 'denoise_50', 'derain', 'dehaze', 'deblur', 'enhance']:
-            opt.de_type = ['blur', 'haze', 'lowlight', 'rain', 'snow']
-        print("[Elvis] de_type = {}".format(opt.de_type))
         print("[Elvis] Creating validation set (last {} images per type)...".format(opt.elvis_val_last_n))
         valset = AdaIRTrainDataset(opt, elvis_val=True)
         val_loader = DataLoader(valset, batch_size=opt.batch_size, pin_memory=True, shuffle=False,
