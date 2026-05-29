@@ -1,4 +1,4 @@
-import argparse
+﻿import argparse
 
 parser = argparse.ArgumentParser()
 
@@ -29,9 +29,16 @@ parser.add_argument('--dehaze_dir', type=str, default='data/Train/Dehaze/',
                     help='where training images of dehazing saves.')
 parser.add_argument('--output_path', type=str, default="output/", help='output save path')
 parser.add_argument('--ckpt_path', type=str, default="ckpt/Denoise/", help='checkpoint save path')
-parser.add_argument("--wblogger",type=str,default="AdaIR",help = "Determine to log to wandb or not and the project name")
+parser.add_argument("--wblogger",type=str,default=None,help = "Determine to log to wandb or not and the project name")
 parser.add_argument("--ckpt_dir",type=str,default="AdaIR",help = "Name of the Directory where the checkpoint is to be saved")
 parser.add_argument("--num_gpus",type=int,default= 4, help = "Number of GPUs to use for training")
 
-options = parser.parse_args()
+# ===== [Elvis 5-Degradation Mode] =====
+parser.add_argument('--elvis_mode', action='store_true', default=False,
+                    help='Enable Elvis 5-degradation training mode')
+parser.add_argument('--elvis_train_dir', type=str, default='../train',
+                    help='Root dir of Elvis 5-type train data (Blur/Haze/Lowlight/Rain/Snow)')
+parser.add_argument('--elvis_val_last_n', type=int, default=50,
+                    help='Reserve last N images per type as validation set')
 
+options = parser.parse_args()

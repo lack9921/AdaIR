@@ -1,4 +1,4 @@
-import os
+﻿import os
 import random
 import copy
 from PIL import Image
@@ -13,7 +13,7 @@ from utils.degradation_utils import Degradation
 
     
 class AdaIRTrainDataset(Dataset):
-    def __init__(self, args):
+    def __init__(self, args, elvis_val=False):
         super(AdaIRTrainDataset, self).__init__()
         self.args = args
         self.rs_ids = []
@@ -23,7 +23,13 @@ class AdaIRTrainDataset(Dataset):
         self.de_type = self.args.de_type
         print(self.de_type)
 
-        self.de_dict = {'denoise_15': 0, 'denoise_25': 1, 'denoise_50': 2, 'derain': 3, 'dehaze': 4, 'deblur' : 5, 'enhance' : 6}
+        # [Elvis] Extended de_dict with 5 new types (ids 7-11)
+        self.de_dict = {'denoise_15': 0, 'denoise_25': 1, 'denoise_50': 2, 'derain': 3, 'dehaze': 4, 'deblur' : 5, 'enhance' : 6,
+                        'elvis_blur': 7, 'elvis_haze': 8, 'elvis_lowlight': 9, 'elvis_rain': 10, 'elvis_snow': 11}
+
+        # [Elvis] Track train/val split
+        self.elvis_val = elvis_val
+        self.elvis_ids = []
 
         self._init_ids()
         self._merge_ids()
@@ -36,19 +42,68 @@ class AdaIRTrainDataset(Dataset):
         self.toTensor = ToTensor()
 
     def _init_ids(self):
+        # --- Original: clean/denoise ---
         if 'denoise_15' in self.de_type or 'denoise_25' in self.de_type or 'denoise_50' in self.de_type:
             self._init_clean_ids()
+        # --- Original: derain ---
         if 'derain' in self.de_type:
             self._init_rs_ids()
+        # --- Original: dehaze ---
         if 'dehaze' in self.de_type:
             self._init_hazy_ids()
+        # --- Original: deblur ---
         if 'deblur' in self.de_type:
             self._init_deblur_ids()
+        # --- Original: enhance ---
         if 'enhance' in self.de_type:
             self._init_enhance_ids()
 
+        # ===== [Elvis 5-Degradation] =====
+        # Detect Elvis types: blur/haze/lowlight/rain/snow
+        if any(d.lower() in ('blur', 'haze', 'lowlight', 'rain', 'snow') for d in self.de_type):
+            self._init_elvis_ids()
+
         random.shuffle(self.de_type)
 
+    # ===== [Elvis] Unified paired LQ鈫扜T loader for 5 degradation types =====
+    def _init_elvis_ids(self):
+        """Load Elvis 5-type data: train/Blur/Haze/Lowlight/Rain/Snow with GT/LQ subdirs.
+           Images are sorted by filename; last `elvis_val_last_n` reserved for val."""
+        elvis_type_map = {
+            'blur': 7, 'haze': 8, 'lowlight': 9, 'rain': 10, 'snow': 11
+        }
+        # Normalize user-provided type names (case-insensitive)
+        elvis_type_names = {d for d in self.de_type if d.lower() in elvis_type_map}
+
+        for de_type_name in elvis_type_names:
+            de_type_key = de_type_name.lower()
+            de_id = elvis_type_map[de_type_key]
+            type_dir = os.path.join(self.args.elvis_train_dir, de_type_name)
+            gt_dir = os.path.join(type_dir, 'GT')
+            lq_dir = os.path.join(type_dir, 'LQ')
+
+            # Get sorted file list (same name in GT and LQ)
+            gt_files = sorted([f for f in os.listdir(gt_dir)
+                               if f.lower().endswith(('.jpg', '.png', '.jpeg', '.bmp'))])
+
+            # Split train/val by last N
+            val_n = self.args.elvis_val_last_n
+            if self.elvis_val:
+                selected = gt_files[-val_n:] if val_n > 0 else []
+            else:
+                selected = gt_files[:-val_n] if val_n > 0 and len(gt_files) > val_n else gt_files
+
+            for fname in selected:
+                self.elvis_ids.append({
+                    'lq_path': os.path.join(lq_dir, fname),
+                    'gt_path': os.path.join(gt_dir, fname),
+                    'de_type': de_id,
+                    'name': os.path.splitext(fname)[0]
+                })
+
+            print(f'[Elvis] {de_type_name}: {len(selected)} samples ({'val' if self.elvis_val else 'train'})')
+
+    # --- Original methods below (unchanged) ---
     def _init_clean_ids(self):
         ref_file = self.args.data_file_dir + "noisy/denoise.txt"
         temp_ids = []
@@ -153,6 +208,7 @@ class AdaIRTrainDataset(Dataset):
 
     def _merge_ids(self):
         self.sample_ids = []
+        # --- Original types ---
         if "denoise_15" in self.de_type:
             self.sample_ids += self.s15_ids
             self.sample_ids += self.s25_ids
@@ -167,12 +223,17 @@ class AdaIRTrainDataset(Dataset):
         if "enhance" in self.de_type:
             self.sample_ids += self.enhance_ids
 
-        print(len(self.sample_ids))
+        # ===== [Elvis] Append 5-type paired data =====
+        if self.elvis_ids:
+            self.sample_ids += self.elvis_ids
+
+        print(f'Total samples: {len(self.sample_ids)}')
 
     def __getitem__(self, idx):
         sample = self.sample_ids[idx]
         de_id = sample["de_type"]
         if de_id < 3:
+            # --- Original: synthetic denoising (noise from clean) ---
             if de_id == 0:
                 clean_id = sample["clean_id"]
             elif de_id == 1:
@@ -189,7 +250,8 @@ class AdaIRTrainDataset(Dataset):
             clean_patch = random_augmentation(clean_patch)[0]
 
             degrad_patch = self.D.single_degrade(clean_patch, de_id)
-        else:
+        elif 3 <= de_id <= 6:
+            # --- Original: paired real degradations ---
             if de_id == 3:
                 # Rain Streak Removal
                 degrad_img = crop_img(np.array(Image.open(sample["clean_id"]).convert('RGB')), base=16)
@@ -210,6 +272,14 @@ class AdaIRTrainDataset(Dataset):
                 degrad_img = crop_img(np.array(Image.open(os.path.join(self.args.enhance_dir, 'low/', sample["clean_id"])).convert('RGB')), base=16)
                 clean_img = crop_img(np.array(Image.open(os.path.join(self.args.enhance_dir, 'gt/', sample["clean_id"])).convert('RGB')), base=16)
                 clean_name = self._get_enhance_name(sample["clean_id"])
+
+            degrad_patch, clean_patch = random_augmentation(*self._crop_patch(degrad_img, clean_img))
+
+        else:
+            # ===== [Elvis] de_id >= 7: unified GT/LQ paired loading =====
+            degrad_img = crop_img(np.array(Image.open(sample['lq_path']).convert('RGB')), base=16)
+            clean_img = crop_img(np.array(Image.open(sample['gt_path']).convert('RGB')), base=16)
+            clean_name = sample['name']
 
             degrad_patch, clean_patch = random_augmentation(*self._crop_patch(degrad_img, clean_img))
 
@@ -398,4 +468,3 @@ class TestSpecificDataset(Dataset):
 
     def __len__(self):
         return self.num_img
-    
