@@ -78,7 +78,7 @@ class AdaIRTrainDataset(Dataset):
         for de_type_name in elvis_type_names:
             de_type_key = de_type_name.lower()
             de_id = elvis_type_map[de_type_key]
-            type_dir = os.path.join(self.args.elvis_train_dir, de_type_name)
+            type_dir = os.path.join(self.args.elvis_train_dir, de_type_name.capitalize())
             gt_dir = os.path.join(type_dir, 'GT')
             lq_dir = os.path.join(type_dir, 'LQ')
 
