@@ -131,7 +131,7 @@ class ElvisTestDataset(Dataset):
         gt_t = self.to_tensor(gt_img)
 
         name = os.path.splitext(fname)[0]
-        return name, lq_t.unsqueeze(0), gt_t.unsqueeze(0)  # 1×3×H×W
+        return name, lq_t, gt_t  # 3×H×W, DataLoader adds batch dim
 
 
 # ====================================================================
