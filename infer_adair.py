@@ -80,9 +80,9 @@ class AdaIRModel(pl.LightningModule):
 #  Save image (tensor → PNG)
 # ====================================================================
 def save_image_tensor(tensor, path):
-    """Save a 3×H×W tensor (0~1) to PNG."""
+    """Save a 3×H×W tensor (0~1) to JPG."""
     img = tensor.mul(255).clamp(0, 255).byte().cpu().permute(1, 2, 0).numpy()
-    Image.fromarray(img).save(path)
+    Image.fromarray(img).save(path, 'JPEG', quality=100)
 
 
 # ====================================================================
@@ -99,7 +99,7 @@ def infer(net, dataset, output_dir, device):
 
         restored = net(lq)                     # 1×3×H×W, 0~1
 
-        out_path = os.path.join(output_dir, f"{name[0]}.png")
+        out_path = os.path.join(output_dir, f"{name[0]}.jpg")
         save_image_tensor(restored[0], out_path)
 
     print(f"\n✅ Done! {len(dataset)} images saved to {output_dir}")
