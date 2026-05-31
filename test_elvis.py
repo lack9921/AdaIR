@@ -49,8 +49,7 @@ def compute_ssim_y(a, b, data_range=1.0):
     gauss = torch.arange(kernel_size, dtype=torch.float32, device=a.device)
     gauss = torch.exp(-((gauss - kernel_size // 2) ** 2) / (2 * sigma ** 2))
     gauss = gauss / gauss.sum()
-    kernel_1d = gauss.view(1, 1, -1)
-    kernel_2d = kernel_1d @ kernel_1d.transpose(1, 2)  # 1×1×k×k
+    kernel_2d = torch.outer(gauss, gauss).view(1, 1, kernel_size, kernel_size)
 
     a = a.unsqueeze(0).unsqueeze(0)  # 1×1×H×W
     b = b.unsqueeze(0).unsqueeze(0)
